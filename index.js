@@ -4,7 +4,7 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 const port = process.env.PORT || 4000;
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 app.use(express.json());
 app.use(cors());
@@ -98,6 +98,23 @@ async function run() {
         });
       } catch (error) {
         console.error("❌ Error fetching jobs:", error);
+        res.status(500).send({ message: "Internal Server Error" });
+      }
+    });
+
+    // Specific job details
+    app.get("/api/jobs/:id", async (req, res) => {
+      try {
+        const jobId = req.params.id;
+        const job = await jobsCollection.findOne({
+          _id: new ObjectId(jobId),
+        });
+        if (!job) {
+          return res.status(404).send({ message: "Job not found" });
+        }
+        res.send(job);
+      } catch (error) {
+        console.error("❌ Error fetching job details:", error);
         res.status(500).send({ message: "Internal Server Error" });
       }
     });
