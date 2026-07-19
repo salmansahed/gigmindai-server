@@ -30,6 +30,7 @@ async function run() {
     // _________________________________Collections End___________________________________________\\
 
     // ________________________________Routes Start___________________________________________\\
+    // Get all jobs with optional search, filter, sort, and pagination
     app.get("/api/jobs", async (req, res) => {
       try {
         const search = req.query.search || "";
@@ -100,6 +101,19 @@ async function run() {
         res.status(500).send({ message: "Internal Server Error" });
       }
     });
+
+    // Post a new job
+    app.post("/api/jobs", async (req, res) => {
+      try {
+        const newJob = req.body;
+        const result = await jobsCollection.insertOne(newJob);
+        res.status(201).send(result);
+      } catch (error) {
+        console.error("❌ Error creating job:", error);
+        res.status(500).send({ message: "Internal Server Error" });
+      }
+    });
+
     // ________________________________Routes End___________________________________________\\
 
     console.log(
