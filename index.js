@@ -119,6 +119,24 @@ async function run() {
       }
     });
 
+    // Get all gigs posted by a specific user (by authorId)
+    app.get("/api/my-gigs/:authorId", async (req, res) => {
+      try {
+        const authorId = req.params.authorId;
+
+        // Query using the string authorId directly as per database structure
+        const query = { authorId: authorId };
+
+        const gigs = await jobsCollection.find(query).toArray();
+
+        // Respond with the fetched gigs array
+        res.send(gigs);
+      } catch (error) {
+        console.error("❌ Error fetching user gigs:", error);
+        res.status(500).send({ message: "Internal Server Error" });
+      }
+    });
+
     // Post a new job
     app.post("/api/jobs", async (req, res) => {
       try {
