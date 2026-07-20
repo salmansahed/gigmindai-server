@@ -132,7 +132,7 @@ async function run() {
       console.error("❌ Error fetching jobs:", error);
       res.status(500).send({ message: "Internal Server Error" });
     }
-  });
+  }); 
 
     // Specific job details
     app.get("/api/jobs/:id", async (req, res) => {
