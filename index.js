@@ -5,9 +5,35 @@ const app = express();
 const cors = require("cors");
 const port = process.env.PORT || 4000;
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const { createRemoteJWKSet, jwtVerify } = require("jose-cjs");
 
 app.use(express.json());
 app.use(cors());
+
+const JWKS = createRemoteJWKSet(
+  new URL(`${process.env.CLIENT_URL}/api/auth/jwks`),
+);
+// Middleware to verify JWT token
+const verifyToken = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  // console.log("authHeader =>", authHeader);
+  if (!authHeader) {
+    return res.status(401).send({ message: "Unauthorized access" });
+  }
+  const token = authHeader.split(" ")[1];
+  // console.log("token =>", token);
+  if (!token) {
+    return res.status(401).send({ message: "Unauthorized access" });
+  }
+  try {
+    const { payload } = await jwtVerify(token, JWKS);
+    // console.log("payload =>", payload);
+    next();
+  } catch (error) {
+    // console.log("error =>", error);
+    return res.status(401).send({ message: "Unauthorized access" });
+  }
+};
 
 app.get("/", (req, res) => {
   res.send("Hello World!");
@@ -120,14 +146,17 @@ async function run() {
     });
 
     // Get all gigs posted by a specific user (by authorId)
-    app.get("/api/my-gigs/:authorId", async (req, res) => {
+    app.get("/api/my-gigs/:authorId", verifyToken, async (req, res) => {
       try {
         const authorId = req.params.authorId;
 
         // Query using the string authorId directly as per database structure
         const query = { authorId: authorId };
 
-        const gigs = await jobsCollection.find(query).toArray();
+        const gigs = await jobsCollection
+          .find(query)
+          .sort({ _id: -1 })
+          .toArray();
 
         // Respond with the fetched gigs array
         res.send(gigs);
@@ -137,8 +166,27 @@ async function run() {
       }
     });
 
+    // Delete a job by ID
+    app.delete("/api/delete-jobs/:id", verifyToken, async (req, res) => {
+      try {
+        const jobId = req.params.id;
+        const result = await jobsCollection.deleteOne({
+          _id: new ObjectId(jobId),
+        });
+        if (result.deletedCount === 0) {
+          return res.status(404).send({ message: "Job not found" });
+        }
+        res
+          .status(200)
+          .send({ message: "Job deleted successfully", success: true });
+      } catch (error) {
+        console.error("❌ Error deleting job:", error);
+        res.status(500).send({ message: "Internal Server Error" });
+      }
+    });
+
     // Post a new job
-    app.post("/api/jobs", async (req, res) => {
+    app.post("/api/jobs", verifyToken, async (req, res) => {
       try {
         const newJob = req.body;
         const result = await jobsCollection.insertOne(newJob);
