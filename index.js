@@ -57,76 +57,82 @@ async function run() {
 
     // ________________________________Routes Start___________________________________________\\
     // Get all jobs with optional search, filter, sort, and pagination
-    app.get("/api/jobs", async (req, res) => {
-      try {
-        const search = req.query.search || "";
-        const category = req.query.category || "";
-        const type = req.query.type || "";
-        const sort = req.query.sort || "latest";
+  app.get("/api/jobs", async (req, res) => {
+    try {
+      const search = req.query.search || "";
+      const category = req.query.category || "";
+      const type = req.query.type || "";
+      const sort = req.query.sort || "latest";
 
-        // Pagination parameters
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 4;
-        const skip = (page - 1) * limit;
+      // Pagination parameters
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 8;
+      const skip = (page - 1) * limit;
 
-        // Build dynamic query object
-        let query = {};
+      // Build dynamic query object
+      let query = {};
 
-        // Search query (Title or Description)
-        if (search) {
-          query.$or = [
-            { title: { $regex: search, $options: "i" } },
-            { description: { $regex: search, $options: "i" } },
-          ];
-        }
-
-        // Category filter
-        if (category && category !== "All" && category !== "All Categories") {
-          query.category = { $regex: `^${category}$`, $options: "i" };
-        }
-
-        // Job type filter
-        if (type && type !== "All") {
-          query.type = { $regex: `^${type}$`, $options: "i" };
-        }
-
-        // Build sorting configuration
-        let sortOption = {};
-        if (sort === "latest") {
-          sortOption._id = -1;
-        } else if (sort === "price-low") {
-          sortOption.price = 1;
-        } else if (sort === "price-high") {
-          sortOption.price = -1;
-        }
-
-        // Fetch filtered data from database
-        const cursor = jobsCollection
-          .find(query)
-          .sort(sortOption)
-          .skip(skip)
-          .limit(limit);
-        const result = await cursor.toArray();
-
-        // Calculate pagination metadata
-        const totalJobs = await jobsCollection.countDocuments(query);
-        const totalPages = Math.ceil(totalJobs / limit);
-
-        // Send response to frontend
-        res.send({
-          jobs: result,
-          meta: {
-            totalJobs,
-            totalPages,
-            currentPage: page,
-            limit,
-          },
-        });
-      } catch (error) {
-        console.error("❌ Error fetching jobs:", error);
-        res.status(500).send({ message: "Internal Server Error" });
+      // 1. Search query (Title or Description)
+      if (search) {
+        query.$or = [
+          { title: { $regex: search, $options: "i" } },
+          { description: { $regex: search, $options: "i" } },
+        ];
       }
-    });
+
+      // Helper function to escape special characters for regex (Fixes "AI & ML" issue)
+      const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+      // 2. Category filter
+      if (category && category !== "All" && category !== "All Categories") {
+        query.category = {
+          $regex: `^${escapeRegex(category)}$`,
+          $options: "i",
+        };
+      }
+
+      // 3. Job type filter 
+      if (type && type !== "All") {
+        query.jobType = { $regex: escapeRegex(type), $options: "i" };
+      }
+
+      // 4. Build sorting configuration (FIXED: Changed 'price' to 'budget' to match your database)
+      let sortOption = {};
+      if (sort === "latest") {
+        sortOption._id = -1;
+      } else if (sort === "price-low") {
+        sortOption.budget = 1;
+      } else if (sort === "price-high") {
+        sortOption.budget = -1;
+      }
+
+      // Fetch filtered data from database
+      const cursor = jobsCollection
+        .find(query)
+        .sort(sortOption)
+        .skip(skip)
+        .limit(limit);
+      const result = await cursor.toArray();
+
+      // Calculate pagination metadata
+      const totalJobs = await jobsCollection.countDocuments(query);
+      const totalPages = Math.ceil(totalJobs / limit);
+
+      // Send response to frontend
+      res.send({
+        jobs: result,
+        meta: {
+          totalJobs,
+          totalPages,
+          currentPage: page,
+          limit,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error fetching jobs:", error);
+      res.status(500).send({ message: "Internal Server Error" });
+    }
+  });
 
     // Specific job details
     app.get("/api/jobs/:id", async (req, res) => {
